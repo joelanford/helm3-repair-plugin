@@ -1,0 +1,9 @@
+name: "repair"
+version: "0.1.0"
+usage: "helm repair RELEASE_NAME"
+description: |-
+  This plugin repairs Helm releases whose resources have
+  been changed outside of Helm. It performs a three-way
+  merge to restore Helm-defined values.
+ignoreFlags: false
+command: "$HELM_PLUGIN_DIR/repair"
