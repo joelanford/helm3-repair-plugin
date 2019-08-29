@@ -1,9 +1,9 @@
-.PHONY: all dep build
+.PHONY: all build
+
+GO111MODULE?=on
+GOPROXY?=https://proxy.golang.org
 
 all: build
 
-dep:
-	dep ensure -v
-
-build: dep
+build:
 	go build -o repair main.go
