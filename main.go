@@ -70,8 +70,8 @@ func initKubeLogs() {
 func newRootCmd(cfg *helmaction.Configuration, w io.Writer, args []string) *cobra.Command {
 	client := action.NewRepair(cfg)
 
-	return &cobra.Command{
-		Use:   "helm repair RELEASE_NAME",
+	cmd := &cobra.Command{
+		Use:   "helm repair [NAME]",
 		Short: "Repair a release that has been modified outside of helm",
 		Long:  "Repair a release that has been modified outside of helm",
 		Args:  require.ExactArgs(1),
@@ -81,13 +81,21 @@ func newRootCmd(cfg *helmaction.Configuration, w io.Writer, args []string) *cobr
 				fmt.Printf("Error: %s\n", err)
 				os.Exit(1)
 			}
+			prefix := ""
+			if client.DryRun {
+				prefix = "DRY RUN: "
+			}
 			if didRepair {
-				fmt.Printf("release %q repaired\n", res.Name)
+				fmt.Printf("%srelease %q repaired\n", prefix, res.Name)
 			} else {
-				fmt.Printf("release %q already up-to-date\n", res.Name)
+				fmt.Printf("%srelease %q already up-to-date\n", prefix, res.Name)
 			}
 		},
 	}
+
+	cmd.Flags().BoolVar(&client.DryRun, "dry-run", false, "simulate a repair")
+
+	return cmd
 }
 
 func main() {

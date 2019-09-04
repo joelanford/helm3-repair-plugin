@@ -19,11 +19,17 @@ package action
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/pmezard/go-difflib/difflib"
 	"helm.sh/helm/pkg/action"
 	"helm.sh/helm/pkg/release"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -37,6 +43,8 @@ import (
 // It provides the implementation of 'helm repair'.
 type Repair struct {
 	cfg *action.Configuration
+
+	DryRun bool
 }
 
 // NewRepair creates a new Repair object with the given configuration.
@@ -86,11 +94,18 @@ func (r *Repair) Run(name string) (*release.Release, bool, error) {
 			return nil
 		}
 
-		_, err = helper.Patch(target.Namespace, target.Name, apitypes.StrategicMergePatchType, patch, nil)
+		patchOpts := &metav1.PatchOptions{}
+		if r.DryRun {
+			patchOpts.DryRun = []string{metav1.DryRunAll}
+		}
+		repaired, err := helper.Patch(target.Namespace, target.Name, apitypes.StrategicMergePatchType, patch, patchOpts)
 		if err != nil {
 			return errors.Wrapf(err, "unable to patch release resource %q", target.Name)
 		}
 		didRepair = true
+		if err := printDiff(current, repaired); err != nil {
+			return errors.Wrapf(err, "unable to print diff for resource %q", target.Name)
+		}
 		return nil
 	})
 	return rel, didRepair, err
@@ -120,4 +135,40 @@ func asVersioned(info *resource.Info) runtime.Object {
 	}
 	obj, _ := runtime.ObjectConvertor(scheme.Scheme).ConvertToVersion(info.Object, gv)
 	return obj
+}
+
+func printDiff(a, b runtime.Object) (err error) {
+	yamlA, err := yaml.Marshal(a)
+	if err != nil {
+		return err
+	}
+	ua := unstructured.Unstructured{}
+	ua.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(a)
+	if err != nil {
+		return err
+	}
+
+	yamlB, err := yaml.Marshal(b)
+	if err != nil {
+		return err
+	}
+	ub := unstructured.Unstructured{}
+	ub.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(b)
+	if err != nil {
+		return err
+	}
+
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(string(yamlA)),
+		B:        difflib.SplitLines(string(yamlB)),
+		FromFile: fmt.Sprintf("%s.%s.%s.%s (current)", strings.ReplaceAll(ua.GroupVersionKind().GroupVersion().String(), "/", "."), ua.GroupVersionKind().Kind, ua.GetNamespace(), ua.GetName()),
+		ToFile:   fmt.Sprintf("%s.%s.%s.%s (target)", strings.ReplaceAll(ub.GroupVersionKind().GroupVersion().String(), "/", "."), ub.GroupVersionKind().Kind, ub.GetNamespace(), ub.GetName()),
+		Context:  3,
+	}
+	text, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return err
+	}
+	fmt.Println(text)
+	return nil
 }

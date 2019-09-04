@@ -41,6 +41,33 @@ deployment.apps/example-my-chart patched
 
 ## Repair the release
 $ helm repair example
+--- apps.v1beta2.Deployment.default.example-my-chart (current)
++++ apps.v1beta2.Deployment.default.example-my-chart (target)
+@@ -4,7 +4,7 @@
+   annotations:
+     deployment.kubernetes.io/revision: "1"
+   creationTimestamp: "2019-09-04T17:56:35Z"
+-  generation: 2
++  generation: 3
+   labels:
+     app.kubernetes.io/instance: example
+     app.kubernetes.io/managed-by: Helm
+@@ -13,12 +13,12 @@
+     helm.sh/chart: my-chart-0.1.0
+   name: example-my-chart
+   namespace: default
+-  resourceVersion: "1508776"
++  resourceVersion: "1508785"
+   selfLink: /apis/apps/v1beta2/namespaces/default/deployments/example-my-chart
+   uid: 56414197-cf3d-11e9-bdc6-049226c40916
+ spec:
+   progressDeadlineSeconds: 600
+-  replicas: 3
++  replicas: 1
+   revisionHistoryLimit: 10
+   selector:
+     matchLabels:
+
 release "example" repaired
 
 ## Check that the number of replicas have been reset
